@@ -1,0 +1,4 @@
+^D:\ARCHIVE\PROJECTS\AFTEREFFECTSSDK\EXAMPLES\PROJECTS\COLORAMEN\COLORAMENPIPL.R
+cl /I "D:\Archive\Projects\AfterEffectsSDK\Examples\Projects\Coloramen\Win\..\..\..\Headers" /EP ".."\\"ColoramenPiPL.r" > "x64\Release\"\\"ColoramenPiPL.rr"
+"D:\Archive\Projects\AfterEffectsSDK\Examples\Projects\Coloramen\Win\..\..\..\Resources\PiPLTool" "x64\Release\ColoramenPiPL.rr" "x64\Release\ColoramenPiPL.rrc"
+cl /D "MSWindows" /EP x64\Release\ColoramenPiPL.rrc >               "D:\Archive\Projects\AfterEffectsSDK\Examples\Projects\Coloramen\Win\"\\"ColoramenPiPL".rc

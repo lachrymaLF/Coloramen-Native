@@ -31,13 +31,14 @@ typedef short int			int16;
 #include "AE_GeneralPlug.h"
 #include "AEFX_ChannelDepthTpl.h"
 #include "AEGP_SuiteHandler.h"
+#include "AEFX_ArbParseHelper.h"
 
 #include "Coloramen_Strings.h"
 
 /* Versioning information */
 
-#define	MAJOR_VERSION	1
-#define	MINOR_VERSION	0
+#define	MAJOR_VERSION	0
+#define	MINOR_VERSION	1
 #define	BUG_VERSION		0
 #define	STAGE_VERSION	PF_Stage_DEVELOP
 #define	BUILD_VERSION	1
@@ -69,8 +70,11 @@ typedef struct OpacityInfo{
 
 #define COLORAMEN_GRAD_REFCON (void*)0xDEADBEEFDEADBEEF
 
+#define COLORAMEN_GRAD_MAX_PRINT_SIZE 512
+
 typedef struct GradientInfo {
 	u_char num_tabs;
+	u_char selected;
 	struct {
 		PF_FpShort pos;
 		PF_PixelFloat color;
@@ -79,11 +83,17 @@ typedef struct GradientInfo {
 
 #define COLORAMEN_GRADIENT_UI_WIDTH		100
 #define COLORAMEN_GRADIENT_UI_HEIGHT	150
+#define COLORAMEN_GRADIENT_BUFFER_WIDTH		300 // different units
+#define COLORAMEN_GRADIENT_BUFFER_HEIGHT	25
 
 typedef struct Aggregate {
 	OpacityInfo			opacity;
 	GradientInfo		grad;
 } Aggregate;
+
+typedef struct GlobalData {
+	unsigned char img[COLORAMEN_GRADIENT_BUFFER_WIDTH][4];
+} GlobalData;
 
 extern "C" {
 
@@ -99,13 +109,14 @@ extern "C" {
 
 }
 
+template <typename T>
+T lerp(const T& a, const T& b, const T& f);
+
 PF_Err
 CreateDefaultGrad(
 	PF_InData* in_data,
 	PF_OutData* out_data,
 	PF_ArbitraryH* dephault);
-
-PF_PixelFloat GetColorARGB(const PF_FpShort& pos, const GradientInfo& grad);
 
 PF_Err
 Grad_Copy(
@@ -113,6 +124,41 @@ Grad_Copy(
 	PF_OutData* out_data,
 	const PF_ArbitraryH* srcP,
 	PF_ArbitraryH* dstP);
+
+PF_Err
+Grad_Compare(
+	PF_InData* in_data,
+	PF_OutData* out_data,
+	const PF_ArbitraryH* a_arbP,
+	const PF_ArbitraryH* b_arbP,
+	PF_ArbCompareResult* resultP);
+
+PF_Err
+Grad_Print(
+	PF_InData* in_data,
+	PF_OutData* out_data,
+	PF_ArbPrintFlags	print_flags,
+	PF_ArbitraryH		arbH,
+	A_u_long			print_sizeLu,
+	A_char* print_bufferPC);
+
+PF_Err
+Grad_Scan(
+	PF_InData* in_data,
+	PF_OutData* out_data,
+	void* refconPV,
+	const char* bufPC,
+	unsigned long		bytes_to_scanLu,
+	PF_ArbitraryH* arbPH);
+
+PF_PixelFloat GetColorARGB(const PF_FpShort& pos, const GradientInfo& grad);
+
+void SwapTabs(GradientInfo* s, u_char a, u_char b);
+
+void AddTab(GradientInfo* grad);
+
+void DelSelectedTab(GradientInfo* grad);
+
 
 PF_Err
 HandleEvent(

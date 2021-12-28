@@ -36,19 +36,8 @@ GlobalSetup (
 							PF_OutFlag_PIX_INDEPENDENT;	// just 16bpc, not 32bpc
 	
 
-	// auto p = new unsigned char[10][4];
 	AEGP_SuiteHandler suites(in_data->pica_basicP);
-	out_data->global_data = suites.HandleSuite1()->host_new_handle(sizeof(unsigned char) * COLORAMEN_GRADIENT_UI_WIDTH * 4);
-	unsigned char* p = reinterpret_cast<unsigned char*>(suites.HandleSuite1()->host_lock_handle(out_data->global_data));
-
-	for (int i = 0; i < 4 * COLORAMEN_GRADIENT_UI_WIDTH; i += 4) {
-		*(p+i) = 255;
-		*(p+i+1) = 255;
-		*(p+i+2) = 255;
-		*(p+i+3) = 255;
-	}
-
-	suites.HandleSuite1()->host_unlock_handle(out_data->global_data);
+	out_data->global_data = suites.HandleSuite1()->host_new_handle(sizeof(GlobalData));
 
 	return PF_Err_NONE;
 }
@@ -97,7 +86,7 @@ ParamsSetup (
 	PF_ADD_ARBITRARY2(	STR(StrID_Gradient_Param_Name),
 						COLORAMEN_GRADIENT_UI_WIDTH,
 						COLORAMEN_GRADIENT_UI_HEIGHT,
-						0,
+						PF_ParamFlag_CANNOT_TIME_VARY,
 						PF_PUI_CONTROL | PF_PUI_DONT_ERASE_CONTROL,
 						def.u.arb_d.dephault,
 						GRADIENT_DISK_ID,
@@ -141,19 +130,26 @@ MySimpleGainFunc16 (
 {
 	PF_Err		err = PF_Err_NONE;
 
-	OpacityInfo	*giP	= reinterpret_cast<OpacityInfo*>(refcon);
-	PF_FpLong	tempF	= 0;
+	Aggregate* ag = reinterpret_cast<Aggregate*>(refcon);
 					
-	if (giP){
-		tempF = giP->opacityF * PF_MAX_CHAN16 / 100.0;
-		if (tempF > PF_MAX_CHAN16){
-			tempF = PF_MAX_CHAN16;
+	if (ag){
+		PF_FpShort opacity = PF_FpShort(ag->opacity.opacityF / 100.0);
+
+		PF_PixelFloat in = {
+			PF_FpShort(inP->alpha) / PF_FpShort(PF_MAX_CHAN16),
+			PF_FpShort(inP->red) / PF_FpShort(PF_MAX_CHAN16),
+			PF_FpShort(inP->green) / PF_FpShort(PF_MAX_CHAN16),
+			PF_FpShort(inP->blue) / PF_FpShort(PF_MAX_CHAN16)
 		};
 
-		outP->alpha		=	inP->alpha;
-		outP->red		=	MIN((inP->red	+ (A_u_char) tempF), PF_MAX_CHAN16);
-		outP->green		=	MIN((inP->green	+ (A_u_char) tempF), PF_MAX_CHAN16);
-		outP->blue		=	MIN((inP->blue	+ (A_u_char) tempF), PF_MAX_CHAN16);
+		PF_FpLong fac = MIN(1.0, 0.2162 * in.red + 0.7152 * in.green + 0.0722 * in.blue);
+
+		auto temp = GetColorARGB((PF_FpShort)fac, ag->grad);
+
+		outP->alpha = inP->alpha == 0 ? 0 : (A_u_short)(lerp<PF_FpShort>(in.alpha, temp.alpha, opacity) * PF_MAX_CHAN16);
+		outP->red =							(A_u_short)(lerp<PF_FpShort>(in.red, temp.red, opacity) * PF_MAX_CHAN16);
+		outP->green =						(A_u_short)(lerp<PF_FpShort>(in.green, temp.green, opacity) * PF_MAX_CHAN16);
+		outP->blue =						(A_u_short)(lerp<PF_FpShort>(in.blue, temp.blue, opacity) * PF_MAX_CHAN16);
 	}
 
 	return err;
@@ -170,19 +166,25 @@ DoIt8 (
 	PF_Err		err = PF_Err_NONE;
 
 	Aggregate* ag	= reinterpret_cast<Aggregate*>(refcon);
-	PF_FpLong	tempF	= 0;
 					
 	if (ag) {
-		tempF = MIN(ag->opacity.opacityF * PF_MAX_CHAN8 / 100.0, PF_MAX_CHAN8);
+		PF_FpShort opacity = PF_FpShort(ag->opacity.opacityF / 100.0);
 
-		PF_FpLong fac = MIN(1.0, (0.2162 * inP->red + 0.7152 * inP->green + 0.0722 * inP->blue) / PF_MAX_CHAN8);
+		PF_PixelFloat in = {
+			PF_FpShort(inP->alpha) / PF_FpShort(PF_MAX_CHAN8),
+			PF_FpShort(inP->red) / PF_FpShort(PF_MAX_CHAN8),
+			PF_FpShort(inP->green) / PF_FpShort(PF_MAX_CHAN8),
+			PF_FpShort(inP->blue) / PF_FpShort(PF_MAX_CHAN8)
+		};
+		
+		PF_FpLong fac = MIN(1.0, 0.2162 * in.red + 0.7152 * in.green + 0.0722 * in.blue);
 
 		auto temp = GetColorARGB((PF_FpShort)fac, ag->grad);
 
-		outP->alpha		=	inP->alpha == 0 ? 0 : (A_u_char) (temp.alpha * PF_MAX_CHAN8);
-		outP->red		=	(A_u_char) (temp.red * PF_MAX_CHAN8);
-		outP->green		=	(A_u_char) (temp.green * PF_MAX_CHAN8);
-		outP->blue		=	(A_u_char) (temp.blue * PF_MAX_CHAN8);
+		outP->alpha		=	inP->alpha == 0 ? 0 :	(A_u_char) (lerp<PF_FpShort>(in.alpha, temp.alpha, opacity) * PF_MAX_CHAN8);
+		outP->red		=							(A_u_char) (lerp<PF_FpShort>(in.red, temp.red, opacity) * PF_MAX_CHAN8);
+		outP->green		=							(A_u_char) (lerp<PF_FpShort>(in.green, temp.green, opacity) * PF_MAX_CHAN8);
+		outP->blue		=							(A_u_char) (lerp<PF_FpShort>(in.blue, temp.blue, opacity) * PF_MAX_CHAN8);
 	}
 
 	return err;
@@ -232,20 +234,73 @@ HandleArbitrary(
 		}
 		break;
 	case PF_Arbitrary_FLAT_SIZE_FUNC:
+		*(extra->u.flat_size_func_params.flat_data_sizePLu) = sizeof(GradientInfo);
 		break;
 	case PF_Arbitrary_FLATTEN_FUNC:
+		if (extra->u.flatten_func_params.buf_sizeLu == sizeof(GradientInfo)) {
+			srcP = (GradientInfo*)PF_LOCK_HANDLE(extra->u.flatten_func_params.arbH);
+			dstP = extra->u.flatten_func_params.flat_dataPV;
+			if (srcP) {
+				memcpy(dstP, srcP, sizeof(GradientInfo));
+			}
+			PF_UNLOCK_HANDLE(extra->u.flatten_func_params.arbH);
+		}
 		break;
 	case PF_Arbitrary_UNFLATTEN_FUNC:
+		if (extra->u.unflatten_func_params.buf_sizeLu == sizeof(GradientInfo)) {
+			PF_Handle	handle = PF_NEW_HANDLE(sizeof(GradientInfo));
+			dstP = (GradientInfo*)PF_LOCK_HANDLE(handle);
+			srcP = (void*)extra->u.unflatten_func_params.flat_dataPV;
+			if (srcP) {
+				memcpy(dstP, srcP, sizeof(GradientInfo));
+			}
+			*(extra->u.unflatten_func_params.arbPH) = handle;
+			PF_UNLOCK_HANDLE(handle);
+		}
 		break;
 	case PF_Arbitrary_INTERP_FUNC:
+		// we dont interp
 		break;
 	case PF_Arbitrary_COMPARE_FUNC:
+		ERR(Grad_Compare(	in_data,
+							out_data,
+							&extra->u.compare_func_params.a_arbH,
+							&extra->u.compare_func_params.b_arbH,
+							extra->u.compare_func_params.compareP));
 		break;
 	case PF_Arbitrary_PRINT_SIZE_FUNC:
+		if (extra->u.print_size_func_params.refconPV == COLORAMEN_GRAD_REFCON) {
+			*extra->u.print_size_func_params.print_sizePLu = COLORAMEN_GRAD_MAX_PRINT_SIZE;
+		}
+		else {
+			err = PF_Err_UNRECOGNIZED_PARAM_TYPE;
+		}
 		break;
 	case PF_Arbitrary_PRINT_FUNC:
+		if (extra->u.print_func_params.refconPV == COLORAMEN_GRAD_REFCON) {
+			ERR(Grad_Print(in_data,
+				out_data,
+				extra->u.print_func_params.print_flags,
+				extra->u.print_func_params.arbH,
+				extra->u.print_func_params.print_sizeLu,
+				extra->u.print_func_params.print_bufferPC));
+		}
+		else {
+			err = PF_Err_UNRECOGNIZED_PARAM_TYPE;
+		}
 		break;
 	case PF_Arbitrary_SCAN_FUNC:
+		if (extra->u.scan_func_params.refconPV == COLORAMEN_GRAD_REFCON) {
+			ERR(Grad_Scan(in_data,
+				out_data,
+				extra->u.scan_func_params.refconPV,
+				extra->u.scan_func_params.bufPC,
+				extra->u.scan_func_params.bytes_to_scanLu,
+				extra->u.scan_func_params.arbPH));
+		}
+		else {
+			err = PF_Err_UNRECOGNIZED_PARAM_TYPE;
+		}
 		break;
 	}
 	return err;
