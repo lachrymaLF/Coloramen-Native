@@ -5,6 +5,8 @@
 
 #include <cwchar>
 
+#include "joker.h"
+
 constexpr float btn_H = 24.0f;
 constexpr float tab_width = 10.0f; // d
 constexpr float tab_height = 25.0f; // d
@@ -160,6 +162,8 @@ DrawEvent(
 				kDRAWBOT_TextTruncation_None,
 				0.0f));
 
+			/*
+			
 			copyConvertStringLiteralIntoUTF16(L"OLIVE GARDEN CONFIDENTIAL", btn_string);
 			text_origin.x = (float)event_extra->effect_win.current_frame.left;
 			text_origin.y += 70.0f;
@@ -181,6 +185,8 @@ DrawEvent(
 				kDRAWBOT_TextAlignment_Left,
 				kDRAWBOT_TextTruncation_None,
 				0.0f));
+
+			*/
 		}
 
 		GradientInfo grad = *reinterpret_cast<GradientInfo*>(suites.HandleSuite1()->host_lock_handle(params[COLORAMEN_GRADIENT]->u.arb_d.value));
@@ -217,7 +223,34 @@ DrawEvent(
 			ERR(drawbotSuites->surface_suiteP->DrawImage(surface_ref, img, &img_origin, 1.0f));
 			img_origin.y += 1.0f;
 		}
+		// release img
+		if (img) {
+			ERR2(drawbotSuites->supplier_suiteP->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(img)));
+		}
 
+
+		DRAWBOT_ImageRef joker_ref = NULL;
+		ERR(drawbotSuites->supplier_suiteP->NewImageFromBuffer(
+			supplier_ref,
+			joker_w,
+			joker_h,
+			joker_w * 4,
+			kDRAWBOT_PixelLayout_32BGRA_Straight,
+			joker,
+			&joker_ref
+		));
+
+		DRAWBOT_PointF32 joker_origin{
+			(float)event_extra->effect_win.current_frame.left,
+			(float)event_extra->effect_win.current_frame.top + 70.0f
+		};
+
+		ERR(drawbotSuites->surface_suiteP->DrawImage(surface_ref, joker_ref, &joker_origin, 1.0f));
+
+		// release joker
+		if (joker_ref) {
+			ERR2(drawbotSuites->supplier_suiteP->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(joker_ref)));
+		}
 
 		DRAWBOT_ColorRGBA stroke_col{ 0.5, 0.5, 0.5, 1.0 };
 		DRAWBOT_ColorRGBA stroke_outer_col{ 0, 0, 0, 1.0 };
@@ -259,10 +292,7 @@ DrawEvent(
 		}
 
 
-		// release img
-		if (img) {
-			ERR2(drawbotSuites->supplier_suiteP->ReleaseObject(reinterpret_cast<DRAWBOT_ObjectRef>(img)));
-		}
+
 
 		// unlock image buffer handle
 		suites.HandleSuite1()->host_unlock_handle(out_data->global_data);
